@@ -1,4 +1,7 @@
 {
 	"clientId": "",
 	"clientSecret": ""
+	"dbUrl": "",
+	"callbackUrl": "/",
+	"hostname": ""
 }

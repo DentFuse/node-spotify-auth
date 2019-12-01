@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css?family=Source+Sans+Pro&display=swap');
+
+body {
+	background: url('/img/login-back.png');
+}
+
+.spotify-button {
+	width: fit-content;
+	background-color: #1ED761;
+	border-radius: 30px;
+}
+
+.spotify-text {
+	padding: 15px 45px;
+	display: block;
+	font-family: 'Source Sans Pro', sans-serif;
+	font-size: 25px;
+	font-weight: 600;
+}
+
+.hideUrl {
+	color: white;
+	text-decoration: none;
+}
+
+.center-h {
+	margin: 0 auto;
+}
+
+.cotainier {
+	position: relative;
+}
+
+.center {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+}
