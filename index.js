@@ -3,6 +3,7 @@ const handlebars = require('express-handlebars');
 const network = require('./network');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs');
 const randomatic = require('randomatic');
 const mongoose = require('mongoose');
 const moment = require('moment');
@@ -13,6 +14,7 @@ const hbs = handlebars.create();
 const config = require('./config.json');
 const models = require('./models');
 const port = process.env.PORT || 8080;
+const apiMap = {};
 app.use('/css', express.static('./views/css'))
 app.use('/img', express.static('./views/img'))
 app.use(cookieParser());
@@ -20,28 +22,37 @@ app.engine('hbs', hbs.engine);
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'hbs');
 signale.start('Connecting to DB...');
-mongoose.connect(config.dbUrl, {useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false}, () => {
-	signale.complete('Connected to database!')
+mongoose.connect(config.dbUrl, {useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false}, async () => {
+	signale.complete('Connected to database!');
+	const files = await fs.readdirSync('./apiPath/');
+	files.forEach(e => {
+		const func = require('./apiPath/' + e);
+		e = e.slice(0, -3);
+		apiMap[e] = func;
+	});
 	app.listen(port, () => {
 		signale.success(`Listening on port ${port}`);
 	});
 });
 
+
 app.get('/', async (req, res) => {
 	const state = req.query.state || req.cookies.state;
 	try {
-		if(!state) throw { error: 'No state token present.', redirect: config.hostname + '/login'};
-		const doc = await models.State.findOne({ state });
-		// signale.info(doc);
-		if(!doc || !doc.accessToken || !doc.refreshToken) throw { error: 'No data in database.', redirect: config.hostname + '/login'};
-		// res.send('Hello World!');
-		const apiRes = await network.get('https://api.spotify.com/v1/me/playlists', authHeader(doc.tokenType + ' ' + doc.accessToken));
-		res.send(apiRes.body);
+		if(!state) throw ({ error: new Error('No state token present.'), redirect: config.hostname + '/login'});
+		const apiRes = JSON.parse((await apiMap.getBasicInfo(state, 'track', true)).replace(/<a[\s]+([^>]+)>((?:.(?!\<\/a\>))*.)<\/a>/, '[Link Removed]'));
+		// signale.info(JSON.parse(apiRes).items.length);
+		searchQuery = apiRes.items.map(e => {
+			out = '', e = e.track;
+			e.artists.forEach(i => out += i.name + ', ');
+			out = out.slice(0, -2) + ' - ' + e.name;
+			return out;
+		});
+		res.send(searchQuery);
 	} catch (e) {
-		// if(typeof e === 'object') e = JSON.parse(e);
 		if(e.body && e.body.error.status == 401 && e.body.error.message === 'The access token expired') return res.redirect(config.hostname + '/refresh')
-		signale.error(e.error || e);
 		if(e.redirect) return res.redirect(e.redirect);
+		signale.error(e.error || e);
 		res.send('An error occured');
 	}
 });
@@ -111,15 +122,10 @@ app.get('/login', async (req, res) => {
 		text: 'Login With Spotify!',
 		title: 'Login - Spotify Auth',
 		css: 'login.css',
-		redirectUrl: urlConstructor('user-read-private user-read-email', state)
+		redirectUrl: urlConstructor('user-read-private user-read-email playlist-read-private playlist-read-collaborative user-library-read', state)
 	});
-	// res.redirect(urlConstructor('user-read-private user-read-email', state));
 });
 
 function urlConstructor(scopes, state) {
 	return 'https://accounts.spotify.com/authorize' + '?show_dialog=' + 'true' + '&response_type=code' + '&client_id=' + config.clientId + (scopes ? '&scope=' + encodeURIComponent(scopes) : '') + '&redirect_uri=' + encodeURIComponent(config.callbackUrl) + '&state=' + state;
-}
-
-function authHeader(value) {
-	return { Authorization: value };
 }
